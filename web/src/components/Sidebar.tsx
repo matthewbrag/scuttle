@@ -6,6 +6,7 @@ export interface Stats {
   ctxMax?: number;
   tokPerSec?: number;
   specAccept?: number;
+  cachedTokens?: number;
 }
 
 export interface ResourceStats {
@@ -57,6 +58,9 @@ export function Sidebar({
             {fmt(stats.ctxUsed)}/{fmt(stats.ctxMax)}
           </span>
         </div>
+        {stats.cachedTokens != null && (
+          <div className="perf-row dim2">{fmt(stats.cachedTokens)} cached ({stats.ctxUsed ? Math.round((stats.cachedTokens / stats.ctxUsed) * 100) : 0}%)</div>
+        )}
         <div className="perf-row dim2">
           {stats.tokPerSec != null ? `${stats.tokPerSec.toFixed(0)} tok/s` : "— tok/s"}
           {stats.specAccept != null ? `  ·  spec ${(stats.specAccept * 100).toFixed(0)}%` : ""}

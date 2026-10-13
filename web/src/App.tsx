@@ -107,7 +107,7 @@ export function App() {
           else if (e.type === "indicators") {
             setIndicators(Object.entries(e.indicators).map(([name, v]) => ({ name, ...v })));
           } else if (e.type === "model_stats") {
-            setStats({ ctxUsed: e.promptTokens, ctxMax: e.ctxMax, tokPerSec: e.tokPerSec, specAccept: e.specAccept });
+            setStats({ ctxUsed: e.promptTokens, ctxMax: e.ctxMax, tokPerSec: e.tokPerSec, specAccept: e.specAccept, cachedTokens: e.cachedTokens });
           } else if (e.type === "resources") {
             setResources({
               cpuPercent: e.cpuPercent,

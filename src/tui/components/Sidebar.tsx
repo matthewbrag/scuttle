@@ -22,6 +22,7 @@ export interface Stats {
   specAccept?: number;
   elapsedMs?: number;
   turn?: number;
+  cachedTokens?: number;
 }
 
 export interface ResourceStats {
@@ -53,13 +54,16 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 }
 
 /** `ctxMeter` is kept separate (not folded into `ctx`'s string) only so the render can
- * color it differently — `ctx` is still the exact full-line text used for measurement. */
-function perfLines(stats: Stats): { ctxMeter: string; ctxRest: string; ctx: string; speed: string; turn: string } {
+ * color it differently — `ctx` is still the exact full-line text used for measurement.
+ * `cached` is null (not a "—" row) when the server hasn't reported it yet, same
+ * omit-rather-than-placeholder convention as resourceLines' `gpu` below. */
+function perfLines(stats: Stats): { ctxMeter: string; ctxRest: string; ctx: string; speed: string; turn: string; cached: string | null } {
   const s = stats;
   const ctxFrac = s.ctxUsed && s.ctxMax ? s.ctxUsed / s.ctxMax : 0;
   const ctxPct = s.ctxUsed && s.ctxMax ? Math.round((s.ctxUsed / s.ctxMax) * 100) : null;
   const ctxMeter = meter(ctxFrac);
   const ctxRest = ` ${fmt(s.ctxUsed)}/${fmt(s.ctxMax)}${ctxPct != null ? ` (${ctxPct}%)` : ""}`;
+  const cachedPct = s.cachedTokens != null && s.ctxUsed ? Math.round((s.cachedTokens / s.ctxUsed) * 100) : null;
   return {
     ctxMeter,
     ctxRest,
@@ -70,6 +74,7 @@ function perfLines(stats: Stats): { ctxMeter: string; ctxRest: string; ctx: stri
     turn:
       (s.elapsedMs != null ? `⏱ ${(s.elapsedMs / 1000).toFixed(1)}s` : "⏱ —") +
       (s.turn != null ? `  ·  turn ${s.turn}` : ""),
+    cached: s.cachedTokens != null ? `${fmt(s.cachedTokens)} cached${cachedPct != null ? ` (${cachedPct}%)` : ""}` : null,
   };
 }
 
@@ -100,7 +105,11 @@ export function Sidebar({
   const perf = perfLines(s);
   const res = resourceLines(r);
 
-  const perfContentLines = wrapCount(perf.ctx, INNER_W) + wrapCount(perf.speed, INNER_W) + wrapCount(perf.turn, INNER_W);
+  const perfContentLines =
+    wrapCount(perf.ctx, INNER_W) +
+    wrapCount(perf.speed, INNER_W) +
+    wrapCount(perf.turn, INNER_W) +
+    (perf.cached ? wrapCount(perf.cached, INNER_W) : 0);
   const perfHeight = PANEL_CHROME + perfContentLines;
 
   const resContentLines = wrapCount(res.cpuMem, INNER_W) + (res.gpu ? wrapCount(res.gpu, INNER_W) : 0);
@@ -137,6 +146,7 @@ export function Sidebar({
         </Text>
         <Text color={theme.dim2}>{perf.speed}</Text>
         <Text color={theme.dim2}>{perf.turn}</Text>
+        {perf.cached ? <Text color={theme.dim2}>{perf.cached}</Text> : null}
       </Panel>
 
       <Panel title="RESOURCES">
