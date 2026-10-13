@@ -1,0 +1,72 @@
+/* "Nebula" — same palette as the TUI (src/tui/theme.ts), for visual continuity. */
+:root {
+  --brand: #a78bfa;
+  --brand-dim: #6d28d9;
+  --user: #22d3ee;
+  --assistant: #e9e4ff;
+  --assistant-accent: #c4b5fd;
+  --tool: #fbbf24;
+  --tool-done: #34d399;
+  --output: #94a3b8;
+  --thinking: #8b7cc9;
+  --dim: #52525b;
+  --dim2: #71717a;
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --err: #f87171;
+  --bg: #0b0b12;
+  --panel: #131320;
+  --border: #26263a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--assistant);
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", Menlo, Consolas, monospace;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+code,
+.code {
+  font-family: inherit;
+  background: rgba(251, 191, 36, 0.12);
+  color: var(--tool);
+  padding: 0.05em 0.3em;
+  border-radius: 4px;
+}
+
+b,
+strong {
+  font-weight: 700;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

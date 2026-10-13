@@ -1,0 +1,28 @@
+# Scuttle control-plane server as a systemd --user service.
+#
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp systemd/scuttle.service ~/.config/systemd/user/
+#   loginctl enable-linger "$USER"          # run even when logged out
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now scuttle
+#
+# Logs:  journalctl --user -u scuttle -f
+#
+# Runs as your user (not root), so containers/files it touches stay yours.
+[Unit]
+Description=Scuttle agent server
+After=network.target docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/projects/scuttle
+ExecStart=%h/projects/scuttle/node_modules/.bin/tsx src/server.ts
+Restart=on-failure
+RestartSec=2
+# Override model / image / gpu here, e.g.:
+# Environment=SCUTTLE_GPU=1
+# Environment=SCUTTLE_MODEL_URL=http://localhost:8080/v1
+
+[Install]
+WantedBy=default.target

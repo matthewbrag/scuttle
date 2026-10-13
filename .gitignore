@@ -1,0 +1,26 @@
+# deps
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# build
+dist/
+build/
+*.tsbuildinfo
+
+# local state / secrets
+.env
+.env.*
+*.local
+.scuttle/
+
+# personal runtime image variants (e.g. docker/Dockerfile.local) — *.local above already
+# covers these; see docker/Dockerfile.gpu-ml.example for the supported pattern instead
+
+# scratch project dirs used for exercising the agent itself — not source, not published
+test-projects/
+
+# os
+.DS_Store

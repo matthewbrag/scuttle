@@ -1,0 +1,56 @@
+# OPTIONAL example runtime — GPU/ML tooling (PyTorch, CUDA, transformers/datasets/
+# jupyter preinstalled). Not built by default; docker/Dockerfile is the lean default
+# every session uses out of the box. Use this one if your agent work is ML-heavy and
+# you don't want to `pip install torch` (slow, GBs) fresh in every new session.
+#
+# Build it under its OWN tag, then point Scuttle at it instead of replacing the default:
+#   docker build -t scuttle-runtime-gpu-ml --build-arg UID=$(id -u) --build-arg GID=$(id -g) \
+#     -f docker/Dockerfile.gpu-ml.example docker/
+#   SCUTTLE_IMAGE=scuttle-runtime-gpu-ml npm run server
+#
+# This is the FLOOR of tooling. Agents install anything else they need at runtime;
+# because Scuttle keeps containers (stop/start, never rm until delete), those
+# installs persist. So this file rarely needs to change.
+#
+# Runs as a non-root user whose uid/gid match the host, so files the agent writes
+# to a bind-mounted project come out owned by you, not root. Installs stay easy:
+# passwordless sudo for apt, and a user-owned venv (with system-site-packages so
+# torch/CUDA from the base image remain visible) so plain `pip install` just works.
+FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_ROOT_USER_ACTION=ignore \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# --- expensive, cache-stable layers (keep identical to preserve build cache) ---
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      git curl wget ripgrep build-essential ca-certificates jq less nano tmux \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir \
+      numpy pandas matplotlib scikit-learn \
+      transformers datasets accelerate huggingface_hub safetensors einops \
+      ipython jupyter
+
+# --- non-root user + install ergonomics (cheap layers, added after the cached ones) ---
+ARG UID=1000
+ARG GID=1000
+
+RUN apt-get update && apt-get install -y --no-install-recommends sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -g ${GID} scuttle 2>/dev/null || true; \
+    useradd -m -u ${UID} -g ${GID} -s /bin/bash scuttle && \
+    echo 'scuttle ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/scuttle && \
+    chmod 0440 /etc/sudoers.d/scuttle
+
+# A writable default venv that still sees torch/cuda + the ML kit from the base env.
+RUN python -m venv --system-site-packages /home/scuttle/venv && \
+    chown -R ${UID}:${GID} /home/scuttle
+
+ENV HOME=/home/scuttle \
+    VIRTUAL_ENV=/home/scuttle/venv \
+    PATH=/home/scuttle/venv/bin:/home/scuttle/.local/bin:/opt/conda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+USER scuttle
+WORKDIR /workspace

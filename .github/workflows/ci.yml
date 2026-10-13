@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  typecheck-build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - run: npm ci
+
+      - run: npm run typecheck
+      - run: npm run typecheck:web
+      - run: npm run build:web
+
+      # Pure-logic + Ink-rendering tests — none need Docker or a live model, so they
+      # run the same way here as locally. Skipped: background-probe.ts (needs a live
+      # session id), sidebar-overflow.tsx and tui-snapshot.tsx (visual-inspection only,
+      # no assertions — nothing for a machine to check). Everything else uses
+      # test/_check.ts, which sets a failing exit code if any check fails.
+      - name: Run test suite
+        run: |
+          set -e
+          for f in abort-crash.ts ghost-message.ts markdown-sync.tsx scroll-logic.ts streaming-logic.ts tui-stress.tsx; do
+            echo "::group::$f"
+            npx tsx "test/$f"
+            echo "::endgroup::"
+          done
