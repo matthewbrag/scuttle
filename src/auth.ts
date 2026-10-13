@@ -35,10 +35,35 @@ export function getOrCreatePassword(): string {
   return pw;
 }
 
-// In-memory on purpose — resets on server restart (back to a login prompt), which is a
-// fine tradeoff for a single-user tool restarted this often during development; nothing
-// about the design stops adding persistence later if that stops being true.
-const validTokens = new Set<string>();
+// Persisted to disk — an in-memory token store meant a login survived only until the
+// NEXT server restart, silently signing out anyone with the tab already open (it still
+// LOOKS logged in until the next request 401s, which reads exactly like stale/broken
+// state). Restarts turned out to be far more frequent in practice than "fine tradeoff"
+// assumed — every single deploy during active development counts. Pruned to the same
+// 30-day window as the cookie's own maxAge, so this can't grow unbounded.
+interface StoredToken {
+  token: string;
+  createdAt: number;
+}
+const TOKENS_PATH = path.join(SCUTTLE_HOME, "auth-tokens.json");
+const TOKEN_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
+
+function loadTokens(): StoredToken[] {
+  try {
+    const raw = JSON.parse(fs.readFileSync(TOKENS_PATH, "utf8")) as StoredToken[];
+    const now = Date.now();
+    return raw.filter((t) => now - t.createdAt < TOKEN_MAX_AGE_MS);
+  } catch {
+    return [];
+  }
+}
+
+function saveTokens() {
+  fs.mkdirSync(SCUTTLE_HOME, { recursive: true });
+  fs.writeFileSync(TOKENS_PATH, JSON.stringify(validTokens), { mode: 0o600 });
+}
+
+let validTokens: StoredToken[] = loadTokens();
 
 function parseCookies(header?: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -61,7 +86,7 @@ function checkBasicAuth(req: Request): boolean {
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const cookies = parseCookies(req.headers.cookie);
-  if (validTokens.has(cookies[COOKIE_NAME])) return next();
+  if (validTokens.some((t) => t.token === cookies[COOKIE_NAME])) return next();
   if (checkBasicAuth(req)) return next();
   res.status(401).json({ error: "unauthorized" });
 }
@@ -72,17 +97,19 @@ export function login(req: Request, res: Response) {
     return res.status(401).json({ error: "wrong password" });
   }
   const token = crypto.randomBytes(32).toString("hex");
-  validTokens.add(token);
+  validTokens.push({ token, createdAt: Date.now() });
+  saveTokens();
   // Not `secure: true` — this same app is also used over plain http://127.0.0.1 locally
   // (TUI's co-located server, direct desktop access), and a Secure cookie is silently
   // dropped by the browser over a non-HTTPS connection, breaking exactly that case.
-  res.cookie(COOKIE_NAME, token, { httpOnly: true, sameSite: "lax", maxAge: 1000 * 60 * 60 * 24 * 30 });
+  res.cookie(COOKIE_NAME, token, { httpOnly: true, sameSite: "lax", maxAge: TOKEN_MAX_AGE_MS });
   res.json({ ok: true });
 }
 
 export function logout(req: Request, res: Response) {
   const cookies = parseCookies(req.headers.cookie);
-  validTokens.delete(cookies[COOKIE_NAME]);
+  validTokens = validTokens.filter((t) => t.token !== cookies[COOKIE_NAME]);
+  saveTokens();
   res.clearCookie(COOKIE_NAME);
   res.json({ ok: true });
 }
