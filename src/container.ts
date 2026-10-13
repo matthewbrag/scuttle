@@ -104,7 +104,8 @@ export function execInContainer(
   name: string,
   command: string,
   signal?: AbortSignal,
-): Promise<{ stdout: string; stderr: string; code: number }> {
+  timeoutMs?: number,
+): Promise<{ stdout: string; stderr: string; code: number; timedOut: boolean }> {
   return new Promise((resolve) => {
     const wrapped = `echo ${PID_MARKER}$$; ${command}`;
     const child = spawn("docker", ["exec", name, "bash", "-lc", wrapped]);
@@ -114,13 +115,27 @@ export function execInContainer(
     let pidLineConsumed = false;
     let containerPid: string | null = null;
     let killed = false;
+    let timedOut = false;
 
-    const onAbort = () => {
+    // Same kill path for both: whether a human cancelled or a timeout fired, the
+    // container-side process tree has to die the same hard-won way (see the long
+    // comment above) — only the reason differs, tracked separately so the caller can
+    // tell the two apart and give the model an actionable message for a timeout.
+    const kill = () => {
       killed = true;
       if (containerPid) void killTreeInContainer(name, containerPid);
       child.kill();
     };
+    const onAbort = () => kill();
     signal?.addEventListener("abort", onAbort, { once: true });
+
+    const timer =
+      timeoutMs != null
+        ? setTimeout(() => {
+            timedOut = true;
+            kill();
+          }, timeoutMs)
+        : null;
 
     // A runaway command (e.g. `yes`) could otherwise grow these strings unboundedly —
     // cap and kill, same protection execFile's old `maxBuffer` gave us for free.
@@ -146,11 +161,13 @@ export function execInContainer(
     });
     child.on("error", (e) => {
       signal?.removeEventListener("abort", onAbort);
-      resolve({ stdout, stderr: stderr || String(e), code: 1 });
+      if (timer) clearTimeout(timer);
+      resolve({ stdout, stderr: stderr || String(e), code: 1, timedOut });
     });
     child.on("close", (code) => {
       signal?.removeEventListener("abort", onAbort);
-      resolve({ stdout, stderr, code: killed ? (code ?? 143) : (code ?? 0) });
+      if (timer) clearTimeout(timer);
+      resolve({ stdout, stderr, code: killed ? (code ?? 143) : (code ?? 0), timedOut });
     });
   });
 }

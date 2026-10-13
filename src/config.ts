@@ -41,3 +41,11 @@ export const ATTACHMENT_TEXT_INLINE_MAX_BYTES = Number(process.env.SCUTTLE_ATTAC
  * a much more generous share of a typical context window; truncation (when it still
  * happens) is now announced in the result text instead of silent. */
 export const TOOL_OUTPUT_MAX_CHARS = Number(process.env.SCUTTLE_TOOL_OUTPUT_MAX_CHARS || 100_000);
+
+/** Default ceiling on a foreground run_bash call before it's killed — there was none at
+ * all before this (only a Ctrl+C from the human, or a 16MB output cap), so a genuinely
+ * hung command (waiting on stdin, a network call that never resolves) just sat there
+ * forever with no recovery and no visible distinction from "still legitimately working".
+ * Generous on purpose: run_bash's own description already steers anything expected to
+ * run long toward background:true instead. */
+export const COMMAND_TIMEOUT_MS = Number(process.env.SCUTTLE_COMMAND_TIMEOUT_MS || 120_000);

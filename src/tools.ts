@@ -5,7 +5,7 @@ import type { SessionMeta, ContentPart } from "./types";
 import { execInContainer } from "./container";
 import { startBackground, checkBackground, killBackground, listTasks } from "./background";
 import { readMeta, updateMeta } from "./store";
-import { TOOL_OUTPUT_MAX_CHARS } from "./config";
+import { TOOL_OUTPUT_MAX_CHARS, COMMAND_TIMEOUT_MS } from "./config";
 import type { AgentEvent } from "./events";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // generous for a chart/screenshot; a full photo
@@ -49,7 +49,8 @@ export const tools: ToolSchema[] = [
       name: "run_bash",
       description:
         "Run a bash command inside the session's sandbox container, in the project directory. " +
-        "Returns the exit code and combined stdout/stderr. For anything long-running (a training " +
+        "Returns the exit code and combined stdout/stderr. Killed after " +
+        `${COMMAND_TIMEOUT_MS / 1000}s if it hasn't finished — for anything long-running (a training ` +
         "run, a dev server, a big download) set background:true instead of waiting — it starts the " +
         "command and returns immediately with a task_id, so you can keep working and check on it " +
         "later with check_background.",
@@ -179,8 +180,15 @@ export async function executeTool(
         return `error starting background task: ${e.message}`;
       }
     }
-    const { stdout, stderr, code } = await execInContainer(session.container, command, signal);
+    const { stdout, stderr, code, timedOut } = await execInContainer(session.container, command, signal, COMMAND_TIMEOUT_MS);
     const out = [stdout, stderr].filter(Boolean).join("\n").trim();
+    if (timedOut) {
+      return truncateOutput(
+        `error: command exceeded the ${COMMAND_TIMEOUT_MS / 1000}s default timeout and was killed. ` +
+          `If this is expected to run long, use background:true instead and poll it with check_background.\n\n` +
+          `Partial output before the timeout:\n${out || "(no output)"}`,
+      );
+    }
     return truncateOutput(`exit ${code}\n${out || "(no output)"}`);
   }
   if (name === "check_background") {
