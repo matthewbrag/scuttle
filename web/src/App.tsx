@@ -132,6 +132,27 @@ export function App() {
     return () => unsubRef.current?.();
   }, [current, attach]);
 
+  // EventSource is supposed to auto-reconnect, but a backgrounded mobile tab can leave
+  // it in a dead-but-not-visibly-errored state — no error shown, just silence, which
+  // reads exactly like "nothing happened" until you refresh and the transcript replay
+  // shows everything was fine server-side the whole time. Forcing a fresh connection
+  // whenever the tab regains focus/visibility is a cheap, reliable backstop regardless
+  // of whether the old connection was actually dead — attach()'s replay-then-subscribe
+  // means a redundant reconnect just re-shows the same state, never loses anything.
+  useEffect(() => {
+    const reconnect = () => {
+      if (document.visibilityState !== "visible" || !current) return;
+      attachRef.current = null; // bypass the idempotent-per-id cache — force a real reconnect
+      void attach(current);
+    };
+    document.addEventListener("visibilitychange", reconnect);
+    window.addEventListener("focus", reconnect);
+    return () => {
+      document.removeEventListener("visibilitychange", reconnect);
+      window.removeEventListener("focus", reconnect);
+    };
+  }, [current, attach]);
+
   const openSession = useCallback((id: string, s?: SessionSummary) => {
     setCurrent(id);
     setMobileView("chat");
@@ -148,6 +169,10 @@ export function App() {
     setResources({});
     setRunning(false);
     setMobileView("chat");
+    // Pick the folder up front, before there's anywhere to type a message into — the
+    // old flow deferred this to first-send, which meant a message typed during folder
+    // selection could feel lost even though it wasn't (see createSessionAt below).
+    setNewSessionDialogOpen(true);
   }, []);
 
   const sendToSession = useCallback(async (id: string, text: string, files: File[]) => {
@@ -285,6 +310,7 @@ export function App() {
       <Sidebar stats={stats} resources={resources} indicators={indicators} />
       <NewSessionDialog
         open={newSessionDialogOpen}
+        pendingText={pendingMessageRef.current?.text}
         onCancel={() => {
           pendingMessageRef.current = null;
           setNewSessionDialogOpen(false);

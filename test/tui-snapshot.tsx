@@ -6,9 +6,9 @@ import type { Block } from "../src/tui/logic";
 const blocks: Block[] = [
   { kind: "user", text: "train a tiny MLP and track the loss" },
   { kind: "thinking", text: "I'll write a training script and expose loss as an indicator." },
-  { kind: "tool", name: "run_bash", args: '{"command":"python train.py"}', result: "exit 0\nepoch 3/10  loss 0.42\nepoch 4/10  loss 0.31", running: false },
+  { kind: "tool", name: "run_bash", args: '{"command":"python train.py"}', result: "exit 0\nepoch 3/10  loss 0.42\nepoch 4/10  loss 0.31", running: false, startedAt: Date.now() },
   { kind: "assistant", text: "Training is converging nicely — loss is down to 0.31." },
-  { kind: "tool", name: "run_bash", args: '{"command":"python eval.py --final"}', result: null, running: true },
+  { kind: "tool", name: "run_bash", args: '{"command":"python eval.py --final"}', result: null, running: true, startedAt: Date.now() - 5000 },
 ];
 
 const { lastFrame } = render(

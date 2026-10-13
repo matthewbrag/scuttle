@@ -11,6 +11,7 @@ import {
   updateMeta,
   deleteSession,
   newId,
+  repairDanglingToolCalls,
 } from "./store";
 import { textOf, type UploadedAttachment } from "./types";
 import {
@@ -286,6 +287,9 @@ if (fs.existsSync(webDist)) {
     res.sendFile(path.join(webDist, "index.html"));
   });
 }
+
+const repaired = repairDanglingToolCalls();
+if (repaired > 0) console.log(`  repaired ${repaired} session(s) interrupted by the last restart`);
 
 app.listen(SERVER_PORT, "127.0.0.1", () => {
   console.log(`scuttle server → http://127.0.0.1:${SERVER_PORT}  (model: ${MODEL_NAME})`);

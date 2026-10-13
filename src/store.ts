@@ -91,3 +91,33 @@ export function readMessages(id: string): Message[] {
     return [];
   }
 }
+
+/** Repairs any session left with a dangling tool_call — the server died mid-exec (e.g.
+ * a restart while a command was still running), so nothing ever appended the matching
+ * tool result. Left alone, this is actively dangerous, not just cosmetic: the NEXT turn
+ * would hand the model a malformed history (a tool_call with no response, which most
+ * OpenAI-compatible APIs reject outright), and the UI would show that tool card as
+ * "running" forever since nothing will ever complete it. Run once at server startup —
+ * a no-op for every session that shut down cleanly. */
+export function repairDanglingToolCalls(): number {
+  let repaired = 0;
+  for (const meta of listSessions()) {
+    const messages = readMessages(meta.id);
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant" || !last.tool_calls?.length) continue;
+    const answeredIds = new Set(messages.filter((m) => m.role === "tool").map((m) => m.tool_call_id));
+    for (const tc of last.tool_calls) {
+      if (answeredIds.has(tc.id)) continue;
+      appendMessage(meta.id, {
+        role: "tool",
+        tool_call_id: tc.id,
+        name: tc.function.name,
+        content:
+          "error: interrupted — the Scuttle server restarted while this command was running, " +
+          "so it never finished and the result was lost. Re-run it if you still need it.",
+      });
+      repaired++;
+    }
+  }
+  return repaired;
+}

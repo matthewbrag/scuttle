@@ -5,10 +5,25 @@ import type { SessionMeta, ContentPart } from "./types";
 import { execInContainer } from "./container";
 import { startBackground, checkBackground, killBackground, listTasks } from "./background";
 import { readMeta, updateMeta } from "./store";
+import { TOOL_OUTPUT_MAX_CHARS } from "./config";
 import type { AgentEvent } from "./events";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // generous for a chart/screenshot; a full photo
 // dump should be resized first — the agent already has run_bash + PIL in-container for that.
+
+/** Clips a tool result to TOOL_OUTPUT_MAX_CHARS — but unlike a bare .slice(), tells the
+ * model when it actually clipped something, and by how much. Without this the model has
+ * no way to know its own output was cut off and no information to act on (reads literally
+ * as "that's everything") — seen live: a model re-reading a file in tiny, blind,
+ * constantly-offset chunks because every truncated result looked complete. */
+function truncateOutput(text: string): string {
+  if (text.length <= TOOL_OUTPUT_MAX_CHARS) return text;
+  return (
+    text.slice(0, TOOL_OUTPUT_MAX_CHARS) +
+    `\n\n[... output truncated: showed ${TOOL_OUTPUT_MAX_CHARS} of ${text.length} characters — ` +
+    `narrow the command (grep/head/tail a specific range) instead of re-requesting the same span]`
+  );
+}
 
 const MIME_BY_EXT: Record<string, string> = {
   ".png": "image/png",
@@ -166,12 +181,12 @@ export async function executeTool(
     }
     const { stdout, stderr, code } = await execInContainer(session.container, command, signal);
     const out = [stdout, stderr].filter(Boolean).join("\n").trim();
-    return `exit ${code}\n${out || "(no output)"}`.slice(0, 20000);
+    return truncateOutput(`exit ${code}\n${out || "(no output)"}`);
   }
   if (name === "check_background") {
     const r = await checkBackground(session, String(args?.task_id ?? ""));
     if (!r) return "error: no such task_id";
-    return `${r.running ? "still running" : "finished"}\n${r.output}`.slice(0, 20000);
+    return truncateOutput(`${r.running ? "still running" : "finished"}\n${r.output}`);
   }
   if (name === "kill_background") {
     const ok = await killBackground(session, String(args?.task_id ?? ""));

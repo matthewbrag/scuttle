@@ -17,7 +17,7 @@ function append(b: Block) {
 
 for (let i = 0; i < 40; i++) {
   append({ kind: "user", text: `message ${i}: do a thing` });
-  append({ kind: "tool", name: "run_bash", args: `{"command":"echo step ${i}"}`, result: `exit 0\nstep ${i} output line a\nstep ${i} output line b`, running: false });
+  append({ kind: "tool", name: "run_bash", args: `{"command":"echo step ${i}"}`, result: `exit 0\nstep ${i} output line a\nstep ${i} output line b`, running: false, startedAt: Date.now() });
   append({ kind: "assistant", text: `Done with step ${i}.` });
 }
 

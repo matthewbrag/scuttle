@@ -6,7 +6,7 @@ export type Block =
   | { kind: "user"; text: string; pending?: boolean }
   | { kind: "assistant"; text: string }
   | { kind: "thinking"; text: string }
-  | { kind: "tool"; name: string; args: string; result: string | null; running: boolean }
+  | { kind: "tool"; name: string; args: string; result: string | null; running: boolean; startedAt: number }
   | { kind: "info"; text: string }
   | { kind: "error"; text: string }
   | { kind: "image"; url: string; caption?: string };
@@ -180,6 +180,20 @@ export function argsPreview(args: string): string {
   }
 }
 
+/** The FULL command/args text — unlike argsPreview's one-line/80-char truncation, which
+ * is all that was ever shown, even in an "expanded" card (the expanded view only added
+ * the output, never the full command that produced it). For run_bash specifically this
+ * is the actual multi-line command, not its JSON-escaped single-line form. */
+export function fullArgsText(args: string): string {
+  try {
+    const o = JSON.parse(args);
+    if (typeof o.command === "string") return o.command;
+    return JSON.stringify(o, null, 2);
+  } catch {
+    return args;
+  }
+}
+
 /** Char-wrap text into fixed-width physical lines. Single source of truth for wrapping,
  * so the estimator and the renderer can never disagree about how many rows something takes. */
 export function wrapLines(text: string, width: number): string[] {
@@ -199,12 +213,27 @@ export function wrapCount(text: string, width: number): number {
   return wrapLines(text, width).length;
 }
 
+/** "47s", "3m12s", "1h05m" — for a running tool call's live elapsed time, so "still
+ * running" distinguishes a legitimately long command from one that's actually dead
+ * (e.g. the server restarted mid-exec — see store.ts's repairDanglingToolCalls). */
+export function formatElapsed(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rs = s % 60;
+  if (m < 60) return `${m}m${String(rs).padStart(2, "0")}s`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return `${h}h${String(rm).padStart(2, "0")}m`;
+}
+
 /** Layout constants shared between the estimator and the renderer — keep these in sync. */
 export const TURN_INDENT = 2; // body text sits indented under its role badge
 // Round border (1 col each side) + paddingX={1} (1 col each side) the card is rendered
 // with — verified empirically (test/box-geometry.tsx): outer width includes BOTH.
 export const CARD_PAD = 4;
 export const MAX_CARD_LINES = 24; // clamp runaway tool output inside an expanded card
+export const MAX_COMMAND_LINES = 8; // clamp a long command (e.g. a heredoc) inside the card
 
 /**
  * Estimate how many terminal rows a block renders to. Used to pick a bottom-anchored
@@ -235,9 +264,10 @@ export function estimateLines(block: Block, width: number, expanded: boolean): n
       if (block.running || !expanded) return MARGIN + 1; // one-line, no border
       if (!block.result) return MARGIN + 1;
       const innerWidth = Math.max(1, width - CARD_PAD);
-      const lines = Math.min(wrapCount(block.result, innerWidth), MAX_CARD_LINES);
-      // top border + in-card header line (icon/name/command) + body + bottom border
-      return MARGIN + 3 + lines;
+      const cmdLines = Math.min(wrapCount(fullArgsText(block.args), innerWidth), MAX_COMMAND_LINES);
+      const outLines = Math.min(wrapCount(block.result, innerWidth), MAX_CARD_LINES);
+      // top border + in-card header line (icon/name/preview) + full command + output + bottom border
+      return MARGIN + 3 + cmdLines + outLines;
     }
   }
 }
@@ -301,7 +331,7 @@ export function applyEvent(blocks: Block[], e: AgentEvent, opts?: { optimistic?:
       return blocks;
     }
     case "tool_call":
-      return [...blocks, { kind: "tool", name: e.name, args: e.args, result: null, running: true }];
+      return [...blocks, { kind: "tool", name: e.name, args: e.args, result: null, running: true, startedAt: Date.now() }];
     case "tool_result": {
       const copy = [...blocks];
       for (let i = copy.length - 1; i >= 0; i--) {

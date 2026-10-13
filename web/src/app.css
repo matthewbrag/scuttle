@@ -379,6 +379,19 @@
 .tool-block.fail .tool-icon { color: var(--err); }
 .tool-name { color: var(--tool); font-weight: 600; flex-shrink: 0; }
 .tool-preview { color: var(--dim2); overflow-wrap: anywhere; min-width: 0; }
+.tool-command {
+  margin: 6px 0 0 0;
+  padding: 8px 12px;
+  background: #0d0d16;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--tool);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 12.5px;
+}
 .tool-output {
   margin: 6px 0 0 0;
   padding: 10px 12px;
@@ -393,11 +406,11 @@
   font-size: 12.5px;
 }
 .tool-block.running {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
   color: var(--tool);
-  cursor: default;
+}
+.tool-output-pending {
+  color: var(--dim) !important;
+  font-style: italic;
 }
 
 .spinner {
@@ -754,6 +767,16 @@
   border-bottom: 1px solid var(--border);
   font-weight: 600;
   color: var(--assistant);
+}
+
+.dialog-pending-note {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--dim2);
+}
+.dialog-pending-text {
+  color: var(--brand);
 }
 
 .dialog-pathbar {

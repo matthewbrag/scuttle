@@ -3,11 +3,14 @@ import { Box, Text } from "ink";
 import { theme } from "../theme";
 import {
   argsPreview,
+  fullArgsText,
+  formatElapsed,
   wrapLines,
   parseBlocks,
   toolOk,
   CARD_PAD,
   MAX_CARD_LINES,
+  MAX_COMMAND_LINES,
   type Block,
   type Span,
 } from "../logic";
@@ -158,7 +161,10 @@ export const MessageBlock = memo(function MessageBlock({
     }
 
     case "tool": {
-      const preview = argsPreview(block.args).slice(0, Math.max(10, width - block.name.length - 8));
+      // Reserve room for the trailing " 9h59m …" / " · N lines ▸" suffix too, or a long
+      // preview can push the line past `width` and wrap — one more line than the
+      // estimator assumed, the exact desync class this file has to stay careful about.
+      const preview = argsPreview(block.args).slice(0, Math.max(10, width - block.name.length - 20));
 
       if (block.running) {
         return (
@@ -169,7 +175,10 @@ export const MessageBlock = memo(function MessageBlock({
                 {" " + block.name}
               </Text>
               <Text color={theme.dim2}> {preview}</Text>
-              <Text color={theme.dim}> …</Text>
+              {/* Rides the SAME spinnerFrame-driven re-render as the spinner above — this
+                  component is memoized, so it only re-renders at all because spinnerFrame
+                  changes each tick, which also gives this a free live-updating clock. */}
+              <Text color={theme.dim}> {formatElapsed(Date.now() - block.startedAt)} …</Text>
             </Text>
           </Box>
         );
@@ -198,6 +207,9 @@ export const MessageBlock = memo(function MessageBlock({
       // Pre-wrapped to EXACTLY the width the estimator assumed, so the rendered height
       // can never disagree with the windowing calculation in logic.ts.
       const innerWidth = Math.max(1, width - CARD_PAD);
+      const wrappedCmd = wrapLines(fullArgsText(block.args), innerWidth);
+      const cmdClipped = wrappedCmd.length > MAX_COMMAND_LINES;
+      const command = (cmdClipped ? wrappedCmd.slice(0, MAX_COMMAND_LINES) : wrappedCmd).join("\n");
       const wrapped = wrapLines(block.result ?? "", innerWidth);
       const clipped = wrapped.length > MAX_CARD_LINES;
       const body = (clipped ? wrapped.slice(-MAX_CARD_LINES) : wrapped).join("\n");
@@ -217,6 +229,9 @@ export const MessageBlock = memo(function MessageBlock({
               {" " + block.name}
             </Text>
             <Text color={theme.dim2}> {preview}</Text>
+          </Text>
+          <Text color={theme.tool} wrap="truncate-end">
+            {command}
           </Text>
           <Text color={theme.output} wrap="truncate-end">
             {body}

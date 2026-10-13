@@ -1,6 +1,17 @@
-import React, { useState } from "react";
-import { argsPreview, parseInline, parseBlocks, toolOk, type Block, type Span } from "../../../src/tui/logic";
+import React, { useState, useEffect } from "react";
+import { argsPreview, fullArgsText, formatElapsed, parseInline, parseBlocks, toolOk, type Block, type Span } from "../../../src/tui/logic";
 import { highlight } from "../prism";
+
+/** Self-ticking — owns its own interval so a running tool block doesn't need the whole
+ * page re-rendering once a second just to keep one timer current. */
+function ElapsedTime({ startedAt }: { startedAt: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <span className="dim"> {formatElapsed(now - startedAt)}</span>;
+}
 
 function Spans({ spans }: { spans: Span[] }) {
   return (
@@ -115,13 +126,23 @@ export function MessageBlock({ block }: { block: Block }) {
     }
     case "tool": {
       const preview = argsPreview(block.args);
+      const command = fullArgsText(block.args);
       if (block.running) {
         return (
-          <div className="tool-block running">
-            <span className="spinner" />
-            <span className="tool-name">{block.name}</span>
-            <span className="tool-preview">{preview}</span>
-            <span className="dim"> …</span>
+          <div className={`tool-block running ${expanded ? "expanded" : ""}`} onClick={() => setExpanded((x) => !x)}>
+            <div className="tool-header">
+              <span className="spinner" />
+              <span className="tool-name">{block.name}</span>
+              <span className="tool-preview">{preview}</span>
+              <ElapsedTime startedAt={block.startedAt} />
+              <span className="dim"> …</span>
+            </div>
+            {expanded && (
+              <>
+                <pre className="tool-command">{command}</pre>
+                <pre className="tool-output tool-output-pending">(running — output will show here once it finishes)</pre>
+              </>
+            )}
           </div>
         );
       }
@@ -135,7 +156,12 @@ export function MessageBlock({ block }: { block: Block }) {
             <span className="tool-preview">{preview}</span>
             {lineCount > 0 && <span className="dim"> · {lineCount} lines {expanded ? "▾" : "▸"}</span>}
           </div>
-          {expanded && <pre className="tool-output">{block.result}</pre>}
+          {expanded && (
+            <>
+              <pre className="tool-command">{command}</pre>
+              <pre className="tool-output">{block.result}</pre>
+            </>
+          )}
         </div>
       );
     }

@@ -33,3 +33,11 @@ export const COMPACTION_KEEP_RECENT = Number(process.env.SCUTTLE_COMPACTION_KEEP
  * left on disk for the agent to read itself instead of being inlined whole. */
 export const UPLOAD_MAX_BYTES = Number(process.env.SCUTTLE_UPLOAD_MAX_BYTES || 20 * 1024 * 1024);
 export const ATTACHMENT_TEXT_INLINE_MAX_BYTES = Number(process.env.SCUTTLE_ATTACHMENT_TEXT_INLINE_MAX_BYTES || 100 * 1024);
+
+/** Cap on a single run_bash/check_background result handed back to the model. Was
+ * hardcoded at 20_000 chars (~5k tokens) with no signal when it clipped — on a 196k-token
+ * model that forced reading any real-sized file in dozens of blind, context-costly
+ * round trips, and worse, the model had no way to know it was even happening. Raised to
+ * a much more generous share of a typical context window; truncation (when it still
+ * happens) is now announced in the result text instead of silent. */
+export const TOOL_OUTPUT_MAX_CHARS = Number(process.env.SCUTTLE_TOOL_OUTPUT_MAX_CHARS || 100_000);

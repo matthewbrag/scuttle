@@ -5,11 +5,15 @@ import type { BrowseEntry } from "../api";
 export function NewSessionDialog({
   open,
   initialPath,
+  pendingText,
   onCancel,
   onConfirm,
 }: {
   open: boolean;
   initialPath?: string;
+  /** The message already typed before this dialog opened, if any — shown so it's clear
+   * nothing was lost while picking a folder (it gets sent automatically once you do). */
+  pendingText?: string;
   onCancel: () => void;
   onConfirm: (path: string) => Promise<void>;
 }) {
@@ -84,6 +88,11 @@ export function NewSessionDialog({
     <div className="dialog-backdrop" onClick={submitting ? undefined : onCancel}>
       <div className="dialog-card" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-title">New session — choose a project folder</div>
+        {pendingText && (
+          <div className="dialog-pending-note">
+            Will send: <span className="dialog-pending-text">"{pendingText}"</span>
+          </div>
+        )}
         <div className="dialog-pathbar">
           <button className="dialog-up-btn" onClick={() => parent && load(parent)} disabled={!parent} title="Up a level" aria-label="Up a level">
             ↑
