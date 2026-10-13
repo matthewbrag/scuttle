@@ -91,6 +91,7 @@ async function chatWithCompactionRetry(
     return await attempt();
   } catch (e) {
     if (e instanceof ContextExceededError) {
+      emit({ type: "compacting" });
       const compacted = await compact(sessionId, fullHistory);
       if (compacted) emit({ type: "compacted", throughIndex: fullHistory.length });
       return await attempt(); // if this also throws, it propagates to the normal catch below
@@ -211,7 +212,7 @@ export async function runTurn(
 
     // Proactive: react to the REAL measured prompt size from the call that just
     // completed, ahead of the NEXT call (this turn's next tool-loop step, or next turn).
-    if (await maybeCompact(sessionId, stats?.promptTokens, ctxMax, fullHistory)) {
+    if (await maybeCompact(sessionId, stats?.promptTokens, ctxMax, fullHistory, () => emit({ type: "compacting" }))) {
       emit({ type: "compacted", throughIndex: fullHistory.length });
     }
 

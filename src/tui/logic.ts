@@ -347,6 +347,8 @@ export function applyEvent(blocks: Block[], e: AgentEvent, opts?: { optimistic?:
       return [...blocks, { kind: "error", text: e.message }];
     case "cancelled":
       return [...blocks, { kind: "info", text: "⏹ cancelled" }];
+    case "compacting":
+      return [...blocks, { kind: "info", text: "🗜 compacting older messages — this can take a little while on a big context…" }];
     case "compacted":
       return [...blocks, { kind: "info", text: `🗜 compacted ${e.throughIndex} earlier messages` }];
     case "retry":

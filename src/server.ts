@@ -247,6 +247,7 @@ app.post("/sessions/:id/compact", async (req, res) => {
   const id = req.params.id;
   if (!readMeta(id)) return res.status(404).json({ error: "not found" });
   try {
+    emitEvent(id, { type: "compacting" });
     const compacted = await compactSession(id, readMessages(id));
     if (compacted) {
       const cp = readCompactionCheckpoint(id);

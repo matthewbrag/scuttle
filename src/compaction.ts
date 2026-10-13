@@ -91,8 +91,10 @@ export async function maybeCompact(
   promptTokens: number | undefined,
   ctxMax: number | undefined,
   fullHistory: Message[],
+  onStart?: () => void,
 ): Promise<boolean> {
   if (!promptTokens || !ctxMax) return false;
   if (promptTokens / ctxMax < COMPACTION_THRESHOLD) return false;
+  onStart?.();
   return compact(sessionId, fullHistory);
 }

@@ -64,6 +64,10 @@ function render(e: AgentEvent) {
     case "status":
       if (e.running) process.stdout.write(`\x1b[90m[running…]\x1b[0m\n`);
       break;
+    case "compacting":
+      streamKind = null;
+      process.stdout.write(`\x1b[90m🗜 compacting older messages…\x1b[0m\n`);
+      break;
     case "compacted":
       streamKind = null;
       process.stdout.write(`\x1b[90m🗜 compacted ${e.throughIndex} earlier messages\x1b[0m\n`);

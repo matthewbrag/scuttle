@@ -41,6 +41,11 @@ export type AgentEvent =
       gpuMemUsedMB?: number;
       gpuMemTotalMB?: number;
     }
+  /** Compaction's own summarize() call can take a real while on a big chunk of history —
+   * without this, that whole stretch looks identical to a frozen UI (no streamed tokens,
+   * no tool call, nothing) until "compacted" finally arrives. Fired right before the call
+   * that will eventually emit "compacted" (or fail silently into the normal error path). */
+  | { type: "compacting" }
   /** Context compaction ran — visible by default (not silent) so it's clear the agent's
    * memory of older messages is now a summary, not verbatim. `throughIndex` is how many
    * of the earliest messages are now covered by the summary instead of sent raw. */
