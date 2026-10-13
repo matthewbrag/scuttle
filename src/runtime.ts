@@ -84,6 +84,15 @@ async function drain(sessionId: string) {
       r.abort = new AbortController();
       try {
         await runTurn(sessionId, input, emit, r.abort.signal);
+      } catch (e: any) {
+        // Last line of defense: runTurn mostly catches its own errors already, but this
+        // is the true top of the per-session pipeline — ANYTHING that slips past that
+        // (a bad SSE chunk during compact(), or whatever the next unanticipated edge
+        // case turns out to be) must fail just THIS turn, not the whole process. Without
+        // this, one session's bad luck was an uncaught rejection that killed every other
+        // session's live connection too — seen live, repeatedly.
+        console.error(`[drain] unhandled error in session ${sessionId}:`, e);
+        emit({ type: "error", message: e?.message || String(e) });
       } finally {
         r.abort = null;
       }

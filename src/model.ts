@@ -118,8 +118,19 @@ class OpenAICompatProvider implements Provider {
       buf = parts.pop() || "";
       for (const part of parts) {
         const line = part.replace(/^data: /, "").trim();
-        if (!line || line === "[DONE]") continue;
-        const chunk = JSON.parse(line);
+        // SSE comment lines (often a keepalive ping on a slow connection — e.g. a long
+        // compaction summarize() call) start with ":" per spec and carry no data; a bare
+        // JSON.parse on one of these was an UNCAUGHT exception that crashed the entire
+        // Node process, not just this request — seen live, repeatedly, always during
+        // compact(). One malformed/unexpected chunk must never be able to take the whole
+        // server down, so this is now defensive regardless of the specific cause.
+        if (!line || line === "[DONE]" || line.startsWith(":")) continue;
+        let chunk: any;
+        try {
+          chunk = JSON.parse(line);
+        } catch {
+          continue; // unparseable chunk — skip it, don't crash the turn (or the server)
+        }
 
         if (chunk.usage || chunk.timings) {
           stats = {
